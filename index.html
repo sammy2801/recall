@@ -321,6 +321,153 @@ forgottenPileBtn.onclick = openForgotten;
 
 // Auto-start on load
 startGame();
+    // TRACKING CURRENT CARD INDEX
+let currentPlayIndex = 0;
+
+// GET SUIT-COLOR ORDER FOR VALUE (used to validate sequences)
+const rankValues = {
+  A: 1, "2": 2, "3": 3, "4": 4,
+  "5": 5, "6": 6, "7": 7, "8": 8,
+  "9": 9, "10": 10
+};
+
+function isNumberCard(card) {
+  return rankValues.hasOwnProperty(card.rank);
+}
+
+// PLAYABLE CARD CLICK HANDLER
+playGridDiv.addEventListener("click", (e) => {
+  const div = e.target.closest(".card-slot");
+  if (!div) return;
+  const index = parseInt(div.dataset.index);
+  if (index !== currentPlayIndex) return; // Can only play a–d, left to right
+
+  const card = playGrid[index];
+  if (!card) return;
+
+  // POWER CARDS
+  if (["J", "Q", "K"].includes(card.rank)) {
+    handlePowerCard(card, index);
+    return;
+  }
+
+  if (card.suit === "JOKER" || isNumberCard(card)) {
+    // Attempt to play into a narrative deck
+    const deckIndex = prompt("Play into Narrative Deck (1–4) or type X to discard?").trim().toUpperCase();
+    if (deckIndex === "X") {
+      forgotten.push(card);
+      advancePlay(index);
+      return;
+    }
+
+    const d = parseInt(deckIndex) - 1;
+    if (d >= 0 && d <= 3) {
+      const pile = narrativeDecks[d];
+      if (pile.length === 3) {
+        alert("That deck is full.");
+        return;
+      }
+
+      // Suit match check
+      if (pile.length === 0 || pile.every(c => c.suit === card.suit || c.suit === "JOKER")) {
+        // Valid continuation
+        pile.push(card);
+        if (pile.length === 3 && validateSequence(pile)) {
+          if (memory[card.suit] === undefined) memory[card.suit] = 0;
+          memory[card.suit]++;
+          narrativeDecks[d] = [];
+          checkGameEnd();
+        }
+        advancePlay(index);
+        renderNarrativeDecks();
+        updateForgottenPile();
+      } else {
+        alert("That card doesn't match the suit of this pile.");
+      }
+    }
+  }
+});
+
+// Validate sequence: same suit, rank spread <=2
+function validateSequence(pile) {
+  const raw = pile.filter(c => c.rank !== "JOKER").map(c => rankValues[c.rank]);
+  if (raw.length < 2) return false;
+  raw.sort((a, b) => a - b);
+  return (raw[2] - raw[0] <= 2); // Flexible within 3-card spread
+}
+
+// HANDLE KING, QUEEN, JACK
+function handlePowerCard(card, index) {
+  if (card.rank === "K") {
+    const choice = prompt("Use King to discard which Narrative Deck (1–4)?");
+    const i = parseInt(choice) - 1;
+    if (i >= 0 && i <= 3 && narrativeDecks[i].length > 0) {
+      forgotten.push(...narrativeDecks[i]);
+      narrativeDecks[i] = [];
+      advancePlay(index);
+      renderNarrativeDecks();
+    } else {
+      alert("Invalid choice.");
+    }
+  } else if (card.rank === "Q") {
+    if (memory[card.suit] === undefined) memory[card.suit] = 0;
+    memory[card.suit]++;
+    advancePlay(index);
+    updateForgottenPile();
+    checkGameEnd();
+  } else if (card.rank === "J") {
+    const action = prompt("JACK: (1) Remove from Narrative Deck or (2) Retrieve from Forgotten?").trim();
+    if (action === "1") {
+      const d = prompt("Which Narrative Deck? (1–4)");
+      const i = parseInt(d) - 1;
+      if (i >= 0 && i <= 3 && narrativeDecks[i].length) {
+        const removed = narrativeDecks[i].pop();
+        forgotten.push(removed);
+        advancePlay(index);
+        renderNarrativeDecks();
+      } else {
+        alert("Invalid deck.");
+      }
+    } else if (action === "2") {
+      if (!forgotten.length) return alert("Forgotten pile is empty.");
+      const select = prompt(`Choose a forgotten card (1–${forgotten.length}):\n${forgotten.map(formatCard).join(" | ")}`);
+      const i = parseInt(select) - 1;
+      if (i >= 0 && i < forgotten.length) {
+        playGrid[index] = forgotten.splice(i, 1)[0];
+        renderPlayGrid();
+      }
+    }
+  }
+}
+
+// Advance play slot index, refill from below
+function advancePlay(index) {
+  const bottomIndex = index + 4;
+  if (bottomIndex < 8 && playGrid[bottomIndex]) {
+    playGrid[index] = playGrid[bottomIndex];
+    playGrid[bottomIndex] = drawCard();
+  } else {
+    playGrid[index] = null;
+  }
+  currentPlayIndex++;
+  renderPlayGrid();
+  updateForgottenPile();
+}
+
+// Check win/lose at game end
+function checkGameEnd() {
+  const goalReached = checkVictoryCondition();
+  const overfilled = Object.keys(memory).some(suit => (memory[suit] || 0) > (memoryGoal[suit] || 0));
+  const drawEmpty = drawPile.length === 0 && currentPlayIndex >= 4 && playGrid.slice(0, 4).every(c => !c);
+
+  if (overfilled) {
+    endMessage.textContent = "❌ You overfilled a suit. Memory corrupted. You lose.";
+  } else if (goalReached) {
+    endMessage.textContent = "✅ You completed your Memory Goal. You win!";
+  } else if (drawEmpty) {
+    endMessage.textContent = "❌ Draw pile exhausted. Memory incomplete. You lose.";
+  }
+}
   </script>
 
 </body>
