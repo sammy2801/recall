@@ -178,7 +178,149 @@
   </div>
 
   <script>
-    // JavaScript will be added in next part
+    const suits = ["♠", "♥", "♦", "♣"];
+const ranks = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+let deck = [];
+let drawPile = [];
+let forgotten = [];
+let memory = {};
+let memoryGoal = {};
+let narrativeDecks = [[], [], [], []];
+let playGrid = []; // 8 cards: a–h
+
+const narrativeDeckDivs = document.querySelectorAll("#narrativeDecks .card-slot");
+const playGridDiv = document.getElementById("playGrid");
+const forgottenPileBtn = document.getElementById("forgottenPile");
+const drawPileDiv = document.getElementById("drawPile");
+const memoryPileDiv = document.getElementById("memoryPile");
+const forgottenOverlay = document.getElementById("forgottenOverlay");
+const forgottenCardsDiv = document.getElementById("forgottenCards");
+const memoryGoalDiv = document.getElementById("memoryGoal");
+const endMessage = document.getElementById("endMessage");
+
+function shuffle(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
+function createDeck() {
+  let cards = [];
+  for (let suit of suits) {
+    for (let rank of ranks) {
+      cards.push({ suit, rank });
+    }
+  }
+  cards.push({ suit: "JOKER", rank: "JOKER" });
+  cards.push({ suit: "JOKER", rank: "JOKER" });
+  return shuffle(cards);
+}
+
+function generateGoal() {
+  const totalSets = 8;
+  const goal = {};
+  const suitsCopy = [...suits];
+  while (Object.values(goal).reduce((a, b) => a + b, 0) < totalSets) {
+    const suit = suitsCopy[Math.floor(Math.random() * suitsCopy.length)];
+    if (!goal[suit]) goal[suit] = 0;
+    if (goal[suit] < 4) goal[suit]++;
+  }
+  return goal;
+}
+
+function updateGoalDisplay() {
+  let text = "Memory Goal: ";
+  for (let suit of suits) {
+    text += `${memoryGoal[suit] || 0} ${suit} `;
+  }
+  memoryGoalDiv.textContent = text.trim();
+}
+
+function drawCard() {
+  return drawPile.length ? drawPile.pop() : null;
+}
+
+function dealInitialPlayGrid() {
+  playGrid = [];
+  for (let i = 0; i < 8; i++) {
+    const card = drawCard();
+    playGrid.push(card || null);
+  }
+  renderPlayGrid();
+}
+
+function renderPlayGrid() {
+  playGridDiv.innerHTML = "";
+  for (let i = 0; i < 8; i++) {
+    const card = playGrid[i];
+    const div = document.createElement("div");
+    div.className = "card-slot";
+    div.dataset.index = i;
+    if (card) div.textContent = formatCard(card);
+    else div.textContent = "";
+    playGridDiv.appendChild(div);
+  }
+}
+
+function formatCard(card) {
+  if (!card) return "";
+  if (card.suit === "JOKER") return "🃏";
+  return `${card.rank}${card.suit}`;
+}
+
+function renderNarrativeDecks() {
+  narrativeDeckDivs.forEach((div, i) => {
+    const pile = narrativeDecks[i];
+    div.textContent = pile.map(formatCard).join(" ");
+    div.className = "card-slot";
+    if (pile.length) div.classList.add("played");
+  });
+}
+
+function updateForgottenPile() {
+  drawPileDiv.textContent = `🎴 Draw: ${drawPile.length}`;
+  memoryPileDiv.textContent = `🧠 Memory (${Object.values(memory).reduce((a, b) => a + b, 0)})`;
+}
+
+function openForgotten() {
+  forgottenOverlay.style.display = "flex";
+  forgottenCardsDiv.innerHTML = forgotten.map(formatCard).join(" ");
+}
+
+function closeForgotten() {
+  forgottenOverlay.style.display = "none";
+}
+
+// 💡 This placeholder function will later check if player met goal
+function checkVictoryCondition() {
+  for (let suit of suits) {
+    if ((memory[suit] || 0) !== memoryGoal[suit]) return false;
+  }
+  return true;
+}
+
+// 🧠 Initialize Game
+function startGame() {
+  deck = createDeck();
+  drawPile = [...deck];
+  forgotten = [];
+  memory = {};
+  memoryGoal = generateGoal();
+  narrativeDecks = [[], [], [], []];
+
+  updateGoalDisplay();
+  dealInitialPlayGrid();
+  renderNarrativeDecks();
+  updateForgottenPile();
+  endMessage.textContent = "";
+}
+
+forgottenPileBtn.onclick = openForgotten;
+
+// Auto-start on load
+startGame();
   </script>
 
 </body>
